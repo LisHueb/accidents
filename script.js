@@ -12,11 +12,28 @@ class SpiralChart {
         this.container = d3.select('#spiral');
         this.tooltip = d3.select('#tooltip');
         this.resize();
+        
+        // Resize-Event für Orientierungsänderungen
+        window.addEventListener('resize', () => {
+            setTimeout(() => this.resize(), 100);
+        });
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.resize(), 300);
+        });
     }
     
     resize() {
         const containerWidth = d3.select('.spiral-container').node().getBoundingClientRect().width;
-        const size = Math.min(containerWidth - 40, 800);
+        const isMobile = window.innerWidth <= 768;
+        
+        let size;
+        if (isMobile) {
+            // Auf mobilen Geräten: Mindestgröße für Lesbarkeit
+            size = Math.max(500, Math.min(containerWidth - 20, 600));
+        } else {
+            // Auf Desktop: Responsive, aber nicht zu groß
+            size = Math.min(containerWidth - 40, 900);
+        }
 
         this.width = size;
         this.height = size;
@@ -25,7 +42,7 @@ class SpiralChart {
         this.container
             .attr('viewBox', `0 0 ${this.width + this.margin.left + this.margin.right} ${this.height + this.margin.top + this.margin.bottom}`)
             .attr('preserveAspectRatio', 'xMidYMid meet')
-            .style('width', '100%')
+            .style('width', isMobile ? size + 'px' : '100%')
             .style('height', 'auto');
 
         if (this.data.length > 0) {
@@ -157,15 +174,20 @@ class SpiralChart {
     createLegend() {
         const maxValue = this.colorScale.domain()[0];
         const minValue = Math.max(1, this.colorScale.domain()[1]);
+        const isMobile = window.innerWidth <= 768;
 
         const legendContainer = d3.select('#legend-container')
             .html('')
             .style('text-align', 'center');
 
+        const containerWidth = legendContainer.node().getBoundingClientRect().width;
+        const svgWidth = Math.min(containerWidth - 20, 500);
+        const rectWidth = Math.min(svgWidth - 40, 400);
+
         const legendSvg = legendContainer
             .append('svg')
-            .attr('width', 500)
-            .attr('height', 50); // höher, damit Text darunter passt
+            .attr('width', svgWidth)
+            .attr('height', isMobile ? 60 : 50);
 
         const defs = legendSvg.append('defs');
         const gradient = defs.append('linearGradient')
@@ -181,9 +203,8 @@ class SpiralChart {
                 .attr('stop-color', this.colorScale(value));
         }
 
-        const rectWidth = 400;
-        const rectHeight = 15;
-        const rectX = (500 - rectWidth) / 2;
+        const rectHeight = isMobile ? 20 : 15;
+        const rectX = (svgWidth - rectWidth) / 2;
 
         legendSvg.append('rect')
             .attr('x', rectX)
@@ -194,15 +215,15 @@ class SpiralChart {
             .style('stroke', '#ccc')
             .attr('stroke-width', 1);
 
-        // Beschriftungen unterhalb
         const middleValue = (minValue + maxValue) / 2;
-        const labelY = 35; // unterhalb des Balkens
+        const labelY = isMobile ? 45 : 35;
+        const fontSize = isMobile ? '14px' : '12px';
 
         legendSvg.append('text')
             .attr('x', rectX)
             .attr('y', labelY)
             .attr('text-anchor', 'start')
-            .attr('font-size', '12px')
+            .attr('font-size', fontSize)
             .attr('font-weight', 'normal')
             .attr('fill', '#333')
             .text(`${Math.round(minValue)}`);
@@ -211,7 +232,7 @@ class SpiralChart {
             .attr('x', rectX + rectWidth / 2)
             .attr('y', labelY)
             .attr('text-anchor', 'middle')
-            .attr('font-size', '12px')
+            .attr('font-size', fontSize)
             .attr('font-weight', 'normal')
             .attr('fill', '#333')
             .text(`${Math.round(middleValue)}`);
@@ -220,7 +241,7 @@ class SpiralChart {
             .attr('x', rectX + rectWidth)
             .attr('y', labelY)
             .attr('text-anchor', 'end')
-            .attr('font-size', '12px')
+            .attr('font-size', fontSize)
             .attr('font-weight', 'normal')
             .attr('fill', '#333')
             .text(`${Math.round(maxValue)}`);
@@ -244,6 +265,7 @@ class SpiralChart {
             .domain([0, maxAccidents])
             .range([0, 60]);
         
+        const isMobile = window.innerWidth <= 768;
         const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
         const defs = g.append('defs');
 
@@ -277,18 +299,23 @@ class SpiralChart {
                 .attr('x2', x2)
                 .attr('y2', y2)
                 .attr('stroke', `url(#${gradId})`)
-                .attr('stroke-width', 0.8);
+                .attr('stroke-width', isMobile ? 1.2 : 0.8);
 
             const labelRadius = endRadius + 55;
             g.append('text')
                 .attr('x', Math.cos(angle) * labelRadius)
                 .attr('y', Math.sin(angle) * labelRadius + 4)
                 .attr('text-anchor', 'middle')
-                .attr('font-size', '12px')
+                .attr('font-size', isMobile ? '14px' : '12px')
                 .attr('font-weight', 'bold')
                 .attr('fill', '#999')
                 .text(month);
         });
+            
+        // Responsive Stroke-Width und Touch-Bereiche
+        const baseStrokeWidth = isMobile ? 2.5 : 1.5;
+        const hoverStrokeWidth = isMobile ? 4 : 3;
+        const touchAreaWidth = isMobile ? 12 : 8;
             
         this.data.forEach((d, i) => {
             const dayProgress = i / totalDays;
@@ -308,21 +335,22 @@ class SpiralChart {
                 .attr('x2', endX)
                 .attr('y2', endY)
                 .attr('stroke', this.colorScale(d.accidents))
-                .attr('stroke-width', 1.5)
+                .attr('stroke-width', baseStrokeWidth)
                 .attr('stroke-linecap', 'round')
                 .attr('opacity', 0.85)
-                .attr('data-base-width', 1.5);
+                .attr('data-base-width', baseStrokeWidth);
 
+            // Vergrößerter Touch-Bereich für mobile Geräte
             lineGroup.append('line')
                 .attr('x1', baseX)
                 .attr('y1', baseY)
                 .attr('x2', endX)
                 .attr('y2', endY)
                 .attr('stroke', 'transparent')
-                .attr('stroke-width', 8)
-                .on('mouseover', (event) => {
+                .attr('stroke-width', touchAreaWidth)
+                .on('mouseover touchstart', (event) => {
                     mainLine
-                        .attr('stroke-width', 3)
+                        .attr('stroke-width', hoverStrokeWidth)
                         .attr('opacity', 1);
 
                     this.tooltip
@@ -335,10 +363,9 @@ class SpiralChart {
                         .style('left', (event.pageX + 10) + 'px')
                         .style('top', (event.pageY - 10) + 'px');
                 })
-                .on('mouseout', () => {
-                    const baseWidth = mainLine.attr('data-base-width');
+                .on('mouseout touchend', () => {
                     mainLine
-                        .attr('stroke-width', baseWidth)
+                        .attr('stroke-width', baseStrokeWidth)
                         .attr('opacity', 0.85);
 
                     this.tooltip.style('opacity', 0);
