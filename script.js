@@ -17,15 +17,17 @@ class SpiralChart {
     resize() {
         const containerWidth = d3.select('.spiral-container').node().getBoundingClientRect().width;
         const size = Math.min(containerWidth - 40, 800);
-        
+
         this.width = size;
         this.height = size;
         this.radius = (Math.min(this.width, this.height) - Math.max(this.margin.top + this.margin.bottom, this.margin.left + this.margin.right)) / 2;
-        
+
         this.container
-            .attr('width', this.width + this.margin.left + this.margin.right)
-            .attr('height', this.height + this.margin.top + this.margin.bottom);
-        
+            .attr('viewBox', `0 0 ${this.width + this.margin.left + this.margin.right} ${this.height + this.margin.top + this.margin.bottom}`)
+            .attr('preserveAspectRatio', 'xMidYMid meet')
+            .style('width', '100%')
+            .style('height', 'auto');
+
         if (this.data.length > 0) {
             this.render();
         }
