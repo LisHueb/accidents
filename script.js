@@ -13,7 +13,7 @@ class SpiralChart {
         this.tooltip = d3.select('#tooltip');
         this.resize();
         
-        // Resize-Event für Orientierungsänderungen
+        // Event Listener für Größenänderungen
         window.addEventListener('resize', () => {
             setTimeout(() => this.resize(), 100);
         });
@@ -23,27 +23,46 @@ class SpiralChart {
     }
     
     resize() {
-        const containerWidth = d3.select('.spiral-container').node().getBoundingClientRect().width;
+        const containerElement = d3.select('.spiral-container').node();
+        const containerRect = containerElement.getBoundingClientRect();
         const isMobile = window.innerWidth <= 768;
         
         let size;
+        
         if (isMobile) {
-            // Auf mobilen Geräten: Mindestgröße für Lesbarkeit
-            size = Math.max(500, Math.min(containerWidth - 20, 600));
+            // Mobile: Nutze die verfügbare Container-Größe optimal
+            // vmin sorgt dafür, dass es immer quadratisch bleibt und reinpasst
+            const availableWidth = containerRect.width - 10;
+            const availableHeight = containerRect.height - 10;
+            size = Math.min(availableWidth, availableHeight);
+            
+            // ViewBox-Ansatz: Interne Koordinaten bleiben gleich, wird nur skaliert
+            this.container
+                .attr('viewBox', `0 0 800 800`) // Fixe interne Größe
+                .attr('preserveAspectRatio', 'xMidYMid meet')
+                .style('width', size + 'px')
+                .style('height', size + 'px');
+                
+            // Interne Berechnungsgrößen basieren auf ViewBox
+            this.width = 800;
+            this.height = 800;
+            this.radius = (Math.min(this.width, this.height) - Math.max(this.margin.top + this.margin.bottom, this.margin.left + this.margin.right)) / 2;
+            
         } else {
-            // Auf Desktop: Responsive, aber nicht zu groß
-            size = Math.min(containerWidth - 40, 900);
+            // Desktop: Normale responsive Berechnung
+            const containerWidth = containerRect.width;
+            size = Math.min(containerWidth - 40, 800);
+
+            this.width = size;
+            this.height = size;
+            this.radius = (Math.min(this.width, this.height) - Math.max(this.margin.top + this.margin.bottom, this.margin.left + this.margin.right)) / 2;
+
+            this.container
+                .attr('viewBox', `0 0 ${this.width + this.margin.left + this.margin.right} ${this.height + this.margin.top + this.margin.bottom}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet')
+                .style('width', '100%')
+                .style('height', 'auto');
         }
-
-        this.width = size;
-        this.height = size;
-        this.radius = (Math.min(this.width, this.height) - Math.max(this.margin.top + this.margin.bottom, this.margin.left + this.margin.right)) / 2;
-
-        this.container
-            .attr('viewBox', `0 0 ${this.width + this.margin.left + this.margin.right} ${this.height + this.margin.top + this.margin.bottom}`)
-            .attr('preserveAspectRatio', 'xMidYMid meet')
-            .style('width', isMobile ? size + 'px' : '100%')
-            .style('height', 'auto');
 
         if (this.data.length > 0) {
             this.render();
@@ -187,7 +206,7 @@ class SpiralChart {
         const legendSvg = legendContainer
             .append('svg')
             .attr('width', svgWidth)
-            .attr('height', isMobile ? 60 : 50);
+            .attr('height', isMobile ? 50 : 50);
 
         const defs = legendSvg.append('defs');
         const gradient = defs.append('linearGradient')
@@ -203,7 +222,7 @@ class SpiralChart {
                 .attr('stop-color', this.colorScale(value));
         }
 
-        const rectHeight = isMobile ? 20 : 15;
+        const rectHeight = 15;
         const rectX = (svgWidth - rectWidth) / 2;
 
         legendSvg.append('rect')
@@ -216,8 +235,8 @@ class SpiralChart {
             .attr('stroke-width', 1);
 
         const middleValue = (minValue + maxValue) / 2;
-        const labelY = isMobile ? 45 : 35;
-        const fontSize = isMobile ? '14px' : '12px';
+        const labelY = 35;
+        const fontSize = isMobile ? '11px' : '12px';
 
         legendSvg.append('text')
             .attr('x', rectX)
@@ -299,23 +318,23 @@ class SpiralChart {
                 .attr('x2', x2)
                 .attr('y2', y2)
                 .attr('stroke', `url(#${gradId})`)
-                .attr('stroke-width', isMobile ? 1.2 : 0.8);
+                .attr('stroke-width', 0.8);
 
             const labelRadius = endRadius + 55;
             g.append('text')
                 .attr('x', Math.cos(angle) * labelRadius)
                 .attr('y', Math.sin(angle) * labelRadius + 4)
                 .attr('text-anchor', 'middle')
-                .attr('font-size', isMobile ? '14px' : '12px')
+                .attr('font-size', isMobile ? '10px' : '12px')
                 .attr('font-weight', 'bold')
                 .attr('fill', '#999')
                 .text(month);
         });
             
-        // Responsive Stroke-Width und Touch-Bereiche
-        const baseStrokeWidth = isMobile ? 2.5 : 1.5;
-        const hoverStrokeWidth = isMobile ? 4 : 3;
-        const touchAreaWidth = isMobile ? 12 : 8;
+        // Touch-optimierte Einstellungen für mobile Geräte
+        const baseStrokeWidth = isMobile ? 2 : 1.5;
+        const hoverStrokeWidth = isMobile ? 3.5 : 3;
+        const touchAreaWidth = isMobile ? 15 : 8;
             
         this.data.forEach((d, i) => {
             const dayProgress = i / totalDays;
@@ -340,7 +359,7 @@ class SpiralChart {
                 .attr('opacity', 0.85)
                 .attr('data-base-width', baseStrokeWidth);
 
-            // Vergrößerter Touch-Bereich für mobile Geräte
+            // Vergrößerte Touch-Bereiche für Mobile
             lineGroup.append('line')
                 .attr('x1', baseX)
                 .attr('y1', baseY)
@@ -364,8 +383,9 @@ class SpiralChart {
                         .style('top', (event.pageY - 10) + 'px');
                 })
                 .on('mouseout touchend', () => {
+                    const baseWidth = mainLine.attr('data-base-width');
                     mainLine
-                        .attr('stroke-width', baseStrokeWidth)
+                        .attr('stroke-width', baseWidth)
                         .attr('opacity', 0.85);
 
                     this.tooltip.style('opacity', 0);
