@@ -270,204 +270,191 @@ class SpiralChart {
     }
     
     render() {
-        this.container.selectAll('*').remove();
+    this.container.selectAll('*').remove();
+    
+    const g = this.container
+        .append('g')
+        .attr('transform', `translate(${this.width / 2}, ${this.height / 2})`);
+    
+    const totalDays = this.data.length;
+    const totalRotations = 4;
+    const startRadius = 60;
+    const endRadius = Math.min(this.width, this.height) / 2 - 80;
+    
+    // Jahre bestimmen
+    const years = [...new Set(this.data.map(d => d.year))].sort();
+    const yearGap = 13;
+    const radiusReduction = Math.abs(yearGap) * (years.length - 1);
+    const adjustedEndRadius = yearGap < 0 ? endRadius - radiusReduction : endRadius + Math.abs(yearGap) * (years.length - 1);
+    const radiusIncrease = (adjustedEndRadius - startRadius) / totalDays;
+    
+    const maxAccidents = d3.max(this.data, d => d.accidents) || 1;
+    const heightScale = d3.scaleLinear()
+        .domain([0, maxAccidents])
+        .range([0, 60]);
+    
+    const isMobile = window.innerWidth <= 768;
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const defs = g.append('defs');
+
+    // Hintergrund-Fläche zeichnen
+    this.createBackgroundArea(g, totalDays, totalRotations, startRadius, radiusIncrease, heightScale(maxAccidents), years, yearGap, adjustedEndRadius);
+
+    // tatsächlicher äußerer Radius
+    const actualEndRadius = adjustedEndRadius + heightScale(maxAccidents);
+
+    // Monatslinien + Labels
+    months.forEach((month, i) => {
+        const dayOffset = -0.5 / totalDays * totalRotations * 2 * Math.PI;
+        const angle = -Math.PI / 2 + (i / 12) * 2 * Math.PI + dayOffset;
         
-        const g = this.container
-            .append('g')
-            .attr('transform', `translate(${this.width/2}, ${this.height/2})`);
+        const x1 = Math.cos(angle) * (startRadius - 30);
+        const y1 = Math.sin(angle) * (startRadius - 30);
+        const x2 = Math.cos(angle) * (actualEndRadius + 32);
+        const y2 = Math.sin(angle) * (actualEndRadius + 32);
+
+        const gradId = `month-gradient-${i}`;
+        const gradient = defs.append('linearGradient')
+            .attr('id', gradId)
+            .attr('gradientUnits', 'userSpaceOnUse')
+            .attr('x1', x1).attr('y1', y1)
+            .attr('x2', x2).attr('y2', y2);
+
+        gradient.append('stop')
+            .attr('offset', '0%')
+            .attr('stop-color', '#bbb')
+            .attr('stop-opacity', 0.05);
+        gradient.append('stop')
+            .attr('offset', '100%')
+            .attr('stop-color', '#666')
+            .attr('stop-opacity', 0.7);
+
+        g.append('line')
+            .attr('x1', x1)
+            .attr('y1', y1)
+            .attr('x2', x2)
+            .attr('y2', y2)
+            .attr('stroke', `url(#${gradId})`)
+            .attr('stroke-width', 0.8);
+
+        const labelRadius = actualEndRadius + 45;
+        g.append('text')
+            .attr('x', Math.cos(angle) * labelRadius)
+            .attr('y', Math.sin(angle) * labelRadius + 4)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', isMobile ? '10px' : '12px')
+            .attr('font-weight', 'bold')
+            .attr('fill', '#999')
+            .text(month);
+    });
+
+    // Jahreslabels direkt am Anfang unterhalb der Balken (feinjustiert)
+    const oneDayAngle = totalRotations * 2 * Math.PI / totalDays;
+    const angleOffsetDays = 3.2; // wie viele "Tage" wir die Beschriftung nach rechts schieben (feinjustierbar)
+
+    years.forEach((year) => {
+        // Versuche gezielt den 1. Januar zu finden, fallback: erster Tag des Jahres in den Daten
+        let firstIndex = this.data.findIndex(d => d.year === year && d.dayOfYear === 1);
+        if (firstIndex === -1) firstIndex = this.data.findIndex(d => d.year === year);
+        if (firstIndex === -1) return;
+        const firstDay = this.data[firstIndex];
+
+        // Winkel (auf Basis des Index im gesamten Datensatz) + kleiner rechter Offset
+        let angle = -Math.PI / 2 + (firstIndex / totalDays) * totalRotations * 2 * Math.PI;
+        angle += oneDayAngle * angleOffsetDays; // verschiebt ein bisschen nach rechts -> "mit dem 1.1. beginnen"
+
+        // Radius des Startpunkts der Balken
+        const radius = startRadius + firstIndex * radiusIncrease;
+
+        // Label knapp unterhalb des Balkenanfangs platzieren (nach innen)
+        const labelRadius = radius - 7; // <--- hier kannst du die Zahl vergrößern/verkleinern
+
+        const yearX = Math.cos(angle) * labelRadius;
+        const yearY = Math.sin(angle) * labelRadius;
+
+        g.append('text')
+            .attr('x', yearX)
+            .attr('y', yearY)
+            .attr('dy', '4px') // kleine vertikale Feinanpassung
+            .attr('text-anchor', 'middle')
+            .attr('font-size', isMobile ? '11px' : '12px') // etwas dezenter als Monatslabels
+            .attr('font-weight', '700')
+            .attr('fill', '#666')
+            .style('pointer-events', 'none')
+            .text(year);
+    });
+
+    // Linien für jeden Tag
+    const maxStrokeWidth = isMobile ? 2 : 1.5;
+    const minStrokeWidth = isMobile ? 0.8 : 0.6;
+    const maxHoverStrokeWidth = isMobile ? 3.5 : 3;
+    const minHoverStrokeWidth = isMobile ? 2 : 1.5;
+    const touchAreaWidth = isMobile ? 15 : 8;
         
-        const totalDays = this.data.length;
-        const totalRotations = 4;
-        const startRadius = 60;
-        const endRadius = Math.min(this.width, this.height) / 2 - 80;
+    this.data.forEach((d, i) => {
+        const dayProgress = i / totalDays;
+        const angle = -Math.PI / 2 + dayProgress * totalRotations * 2 * Math.PI;
         
-        // Berechne Jahre und füge Abstände zwischen Jahren hinzu
-        const years = [...new Set(this.data.map(d => d.year))].sort();
-        const yearGap = 13; // Negativer Wert = Jahre rücken zusammen, positiver Wert = mehr Abstand
+        const radius = startRadius + i * radiusIncrease;
         
-        // Bei negativem yearGap reduzieren wir den verfügbaren Radius
-        const radiusReduction = Math.abs(yearGap) * (years.length - 1);
-        const adjustedEndRadius = yearGap < 0 ? endRadius - radiusReduction : endRadius + Math.abs(yearGap) * (years.length - 1);
-        const radiusIncrease = (adjustedEndRadius - startRadius) / totalDays;
-        
-        const maxAccidents = d3.max(this.data, d => d.accidents) || 1;
-        const heightScale = d3.scaleLinear()
-            .domain([0, maxAccidents])
-            .range([0, 60]); // Konstante Höhe für alle Jahre
-        
-        const isMobile = window.innerWidth <= 768;
-        const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-        const defs = g.append('defs');
+        const baseX = Math.cos(angle) * radius;
+        const baseY = Math.sin(angle) * radius;
+        const lineHeight = heightScale(d.accidents);
+        const endX = Math.cos(angle) * (radius + lineHeight);
+        const endY = Math.sin(angle) * (radius + lineHeight);
 
-        // Erstelle Hintergrund-Fläche als zusammenhängende Area
-        this.createBackgroundArea(g, totalDays, totalRotations, startRadius, radiusIncrease, heightScale(maxAccidents), years, yearGap, adjustedEndRadius);
+        const radiusProgress = (radius - startRadius) / (endRadius - startRadius);
+        const currentStrokeWidth = minStrokeWidth + (maxStrokeWidth - minStrokeWidth) * radiusProgress;
+        const currentHoverStrokeWidth = minHoverStrokeWidth + (maxHoverStrokeWidth - minHoverStrokeWidth) * radiusProgress;
 
-        // Berechne tatsächlichen äußeren Radius (mit maximaler Linienhöhe)
-        const actualEndRadius = adjustedEndRadius + heightScale(maxAccidents);
+        const lineGroup = g.append('g').style('cursor', 'pointer');
 
-        months.forEach((month, i) => {
-            const dayOffset = -0.5 / totalDays * totalRotations * 2 * Math.PI;
-            const angle = -Math.PI / 2 + (i / 12) * 2 * Math.PI + dayOffset;
-            
-            // Beginne die Linie etwas vor dem Startradius
-            const x1 = Math.cos(angle) * (startRadius - 30);
-            const y1 = Math.sin(angle) * (startRadius - 30);
-            
-            // Erweitere die Linie über den tatsächlichen äußeren Rand hinaus
-            const x2 = Math.cos(angle) * (actualEndRadius + 32);
-            const y2 = Math.sin(angle) * (actualEndRadius + 32);
+        const mainLine = lineGroup.append('line')
+            .attr('x1', baseX)
+            .attr('y1', baseY)
+            .attr('x2', endX)
+            .attr('y2', endY)
+            .attr('stroke', this.colorScale(d.accidents))
+            .attr('stroke-width', currentStrokeWidth)
+            .attr('stroke-linecap', 'round')
+            .attr('opacity', 0.85)
+            .attr('data-base-width', currentStrokeWidth)
+            .attr('data-hover-width', currentHoverStrokeWidth);
 
-            const gradId = `month-gradient-${i}`;
-            const gradient = defs.append('linearGradient')
-                .attr('id', gradId)
-                .attr('gradientUnits', 'userSpaceOnUse')
-                .attr('x1', x1).attr('y1', y1)
-                .attr('x2', x2).attr('y2', y2);
+        lineGroup.append('line')
+            .attr('x1', baseX)
+            .attr('y1', baseY)
+            .attr('x2', endX)
+            .attr('y2', endY)
+            .attr('stroke', 'transparent')
+            .attr('stroke-width', touchAreaWidth)
+            .on('mouseover touchstart', (event) => {
+                const hoverWidth = parseFloat(mainLine.attr('data-hover-width'));
+                mainLine
+                    .attr('stroke-width', hoverWidth)
+                    .attr('opacity', 1);
 
-            gradient.append('stop')
-                .attr('offset', '0%')
-                .attr('stop-color', '#bbb')
-                .attr('stop-opacity', 0.05);
-            gradient.append('stop')
-                .attr('offset', '100%')
-                .attr('stop-color', '#666')
-                .attr('stop-opacity', 0.7);
+                this.tooltip
+                    .style('opacity', 1)
+                    .html(`
+                        <strong>Datum:</strong> ${d.date.toLocaleDateString('de-DE')}<br/>
+                        <strong>E-Scooter Unfälle:</strong> ${d.accidents}<br/>
+                        <strong>Jahr:</strong> ${d.year}
+                    `)
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px');
+            })
+            .on('mouseout touchend', () => {
+                const baseWidth = parseFloat(mainLine.attr('data-base-width'));
+                mainLine
+                    .attr('stroke-width', baseWidth)
+                    .attr('opacity', 0.85);
 
-            g.append('line')
-                .attr('x1', x1)
-                .attr('y1', y1)
-                .attr('x2', x2)
-                .attr('y2', y2)
-                .attr('stroke', `url(#${gradId})`)
-                .attr('stroke-width', 0.8);
+                this.tooltip.style('opacity', 0);
+            });
+    });
+}
 
-            // Platziere die Beschriftung noch weiter außen
-            const labelRadius = actualEndRadius + 45;
-            g.append('text')
-                .attr('x', Math.cos(angle) * labelRadius)
-                .attr('y', Math.sin(angle) * labelRadius + 4)
-                .attr('text-anchor', 'middle')
-                .attr('font-size', isMobile ? '10px' : '12px')
-                .attr('font-weight', 'bold')
-                .attr('fill', '#999')
-                .text(month);
-        });
-
-        // Jahresbeschriftungen hinzufügen
-        years.forEach((year, yearIndex) => {
-            // Position für Jahresbeschriftung: rechts von Januar-Linie
-            const januaryAngle = -Math.PI / 2 + Math.PI / 12; // Etwas versetzt von Januar
-            
-            // Finde den mittleren Radius für dieses Jahr
-            const yearData = this.data.filter(d => d.year === year);
-            if (yearData.length > 0) {
-                const yearStartIndex = this.data.findIndex(d => d.year === year);
-                const yearEndIndex = this.data.map((d, i) => d.year === year ? i : -1).filter(i => i !== -1).pop();
-                
-                const yearStartRadius = startRadius + yearStartIndex * radiusIncrease;
-                const yearEndRadius = startRadius + yearEndIndex * radiusIncrease;
-                const yearMidRadius = (yearStartRadius + yearEndRadius) / 2;
-                
-                // Position für die Jahresbeschriftung
-                const yearLabelRadius = yearMidRadius + 35;
-                const yearX = Math.cos(januaryAngle) * yearLabelRadius;
-                const yearY = Math.sin(januaryAngle) * yearLabelRadius;
-                
-                // Hintergrund für bessere Lesbarkeit
-                g.append('circle')
-                    .attr('cx', yearX)
-                    .attr('cy', yearY)
-                    .attr('r', 18)
-                    .attr('fill', 'white')
-                    .attr('opacity', 0.8)
-                    .attr('stroke', '#ccc')
-                    .attr('stroke-width', 1);
-                
-                g.append('text')
-                    .attr('x', yearX)
-                    .attr('y', yearY + 4)
-                    .attr('text-anchor', 'middle')
-                    .attr('font-size', isMobile ? '11px' : '13px')
-                    .attr('font-weight', 'bold')
-                    .attr('fill', '#333')
-                    .text(year);
-            }
-        });
-            
-        // Touch-optimierte Einstellungen für mobile Geräte
-        const maxStrokeWidth = isMobile ? 2 : 1.5;
-        const minStrokeWidth = isMobile ? 0.8 : 0.6;
-        const maxHoverStrokeWidth = isMobile ? 3.5 : 3;
-        const minHoverStrokeWidth = isMobile ? 2 : 1.5;
-        const touchAreaWidth = isMobile ? 15 : 8;
-            
-        this.data.forEach((d, i) => {
-            const dayProgress = i / totalDays;
-            const angle = -Math.PI / 2 + dayProgress * totalRotations * 2 * Math.PI;
-            
-            // Berechne Radius - bei negativem yearGap werden Jahre kompakter
-            const radius = startRadius + i * radiusIncrease;
-            
-            const baseX = Math.cos(angle) * radius;
-            const baseY = Math.sin(angle) * radius;
-            const lineHeight = heightScale(d.accidents);
-            const endX = Math.cos(angle) * (radius + lineHeight);
-            const endY = Math.sin(angle) * (radius + lineHeight);
-
-            // Progressive Linienstärke: Innen dünner, außen dicker
-            const radiusProgress = (radius - startRadius) / (endRadius - startRadius);
-            const currentStrokeWidth = minStrokeWidth + (maxStrokeWidth - minStrokeWidth) * radiusProgress;
-            const currentHoverStrokeWidth = minHoverStrokeWidth + (maxHoverStrokeWidth - minHoverStrokeWidth) * radiusProgress;
-
-            const lineGroup = g.append('g').style('cursor', 'pointer');
-
-            // Hauptlinie (tatsächliche Werte)
-            const mainLine = lineGroup.append('line')
-                .attr('x1', baseX)
-                .attr('y1', baseY)
-                .attr('x2', endX)
-                .attr('y2', endY)
-                .attr('stroke', this.colorScale(d.accidents))
-                .attr('stroke-width', currentStrokeWidth)
-                .attr('stroke-linecap', 'round')
-                .attr('opacity', 0.85)
-                .attr('data-base-width', currentStrokeWidth)
-                .attr('data-hover-width', currentHoverStrokeWidth);
-
-            // Vergrößerte Touch-Bereiche für Mobile
-            lineGroup.append('line')
-                .attr('x1', baseX)
-                .attr('y1', baseY)
-                .attr('x2', endX)
-                .attr('y2', endY)
-                .attr('stroke', 'transparent')
-                .attr('stroke-width', touchAreaWidth)
-                .on('mouseover touchstart', (event) => {
-                    const hoverWidth = parseFloat(mainLine.attr('data-hover-width'));
-                    mainLine
-                        .attr('stroke-width', hoverWidth)
-                        .attr('opacity', 1);
-
-                    this.tooltip
-                        .style('opacity', 1)
-                        .html(`
-                            <strong>Datum:</strong> ${d.date.toLocaleDateString('de-DE')}<br/>
-                            <strong>E-Scooter Unfälle:</strong> ${d.accidents}<br/>
-                            <strong>Jahr:</strong> ${d.year}
-                        `)
-                        .style('left', (event.pageX + 10) + 'px')
-                        .style('top', (event.pageY - 10) + 'px');
-                })
-                .on('mouseout touchend', () => {
-                    const baseWidth = parseFloat(mainLine.attr('data-base-width'));
-                    mainLine
-                        .attr('stroke-width', baseWidth)
-                        .attr('opacity', 0.85);
-
-                    this.tooltip.style('opacity', 0);
-                });
-        });
-    }
 
     createBackgroundArea(g, totalDays, totalRotations, startRadius, radiusIncrease, maxLineHeight, years, yearGap, adjustedEndRadius) {
         // Erstelle Pfad für die äußere Spirale (maximale Höhe)
