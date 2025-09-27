@@ -36,9 +36,9 @@ class SpiralChart {
             const availableHeight = containerRect.height - 10;
             size = Math.min(availableWidth, availableHeight);
             
-            // ViewBox-Ansatz: Interne Koordinaten bleiben gleich, wird nur skaliert
+            // ViewBox-Ansatz: Größere ViewBox für die Beschriftungen
             this.container
-                .attr('viewBox', `0 0 800 800`) // Fixe interne Größe
+                .attr('viewBox', `-100 -100 1000 1000`) // Vergrößert von 800 auf 1000
                 .attr('preserveAspectRatio', 'xMidYMid meet')
                 .style('width', size + 'px')
                 .style('height', size + 'px');
@@ -57,8 +57,11 @@ class SpiralChart {
             this.height = size;
             this.radius = (Math.min(this.width, this.height) - Math.max(this.margin.top + this.margin.bottom, this.margin.left + this.margin.right)) / 2;
 
+            // Größere ViewBox auch für Desktop
+            const viewBoxSize = size;
+            const padding = 100; // zusätzlicher Rand
             this.container
-                .attr('viewBox', `0 0 ${this.width + this.margin.left + this.margin.right} ${this.height + this.margin.top + this.margin.bottom}`)
+                .attr('viewBox', `${-padding} ${-padding} ${viewBoxSize + 2*padding} ${viewBoxSize + 2*padding}`)
                 .attr('preserveAspectRatio', 'xMidYMid meet')
                 .style('width', '100%')
                 .style('height', 'auto');
@@ -271,30 +274,48 @@ class SpiralChart {
         
         const g = this.container
             .append('g')
-            .attr('transform', `translate(${(this.width + this.margin.left + this.margin.right) / 2}, ${(this.height + this.margin.top + this.margin.bottom) / 2})`);
+            .attr('transform', `translate(${this.width/2}, ${this.height/2})`);
         
         const totalDays = this.data.length;
         const totalRotations = 4;
         const startRadius = 60;
         const endRadius = Math.min(this.width, this.height) / 2 - 80;
-        const radiusIncrease = (endRadius - startRadius) / totalDays;
+        
+        // Berechne Jahre und füge Abstände zwischen Jahren hinzu
+        const years = [...new Set(this.data.map(d => d.year))].sort();
+        const yearGap = 13; // Negativer Wert = Jahre rücken zusammen, positiver Wert = mehr Abstand
+        
+        // Bei negativem yearGap reduzieren wir den verfügbaren Radius
+        const radiusReduction = Math.abs(yearGap) * (years.length - 1);
+        const adjustedEndRadius = yearGap < 0 ? endRadius - radiusReduction : endRadius + Math.abs(yearGap) * (years.length - 1);
+        const radiusIncrease = (adjustedEndRadius - startRadius) / totalDays;
         
         const maxAccidents = d3.max(this.data, d => d.accidents) || 1;
         const heightScale = d3.scaleLinear()
             .domain([0, maxAccidents])
-            .range([0, 60]);
+            .range([0, 60]); // Konstante Höhe für alle Jahre
         
         const isMobile = window.innerWidth <= 768;
         const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
         const defs = g.append('defs');
 
+        // Erstelle Hintergrund-Fläche als zusammenhängende Area
+        this.createBackgroundArea(g, totalDays, totalRotations, startRadius, radiusIncrease, heightScale(maxAccidents), years, yearGap, adjustedEndRadius);
+
+        // Berechne tatsächlichen äußeren Radius (mit maximaler Linienhöhe)
+        const actualEndRadius = adjustedEndRadius + heightScale(maxAccidents);
+
         months.forEach((month, i) => {
             const dayOffset = -0.5 / totalDays * totalRotations * 2 * Math.PI;
             const angle = -Math.PI / 2 + (i / 12) * 2 * Math.PI + dayOffset;
-            const x1 = Math.cos(angle) * (startRadius - 20);
-            const y1 = Math.sin(angle) * (startRadius - 20);
-            const x2 = Math.cos(angle) * (endRadius + 40);
-            const y2 = Math.sin(angle) * (endRadius + 40);
+            
+            // Beginne die Linie etwas vor dem Startradius
+            const x1 = Math.cos(angle) * (startRadius - 30);
+            const y1 = Math.sin(angle) * (startRadius - 30);
+            
+            // Erweitere die Linie über den tatsächlichen äußeren Rand hinaus
+            const x2 = Math.cos(angle) * (actualEndRadius + 32);
+            const y2 = Math.sin(angle) * (actualEndRadius + 32);
 
             const gradId = `month-gradient-${i}`;
             const gradient = defs.append('linearGradient')
@@ -320,7 +341,8 @@ class SpiralChart {
                 .attr('stroke', `url(#${gradId})`)
                 .attr('stroke-width', 0.8);
 
-            const labelRadius = endRadius + 55;
+            // Platziere die Beschriftung noch weiter außen
+            const labelRadius = actualEndRadius + 45;
             g.append('text')
                 .attr('x', Math.cos(angle) * labelRadius)
                 .attr('y', Math.sin(angle) * labelRadius + 4)
@@ -330,34 +352,87 @@ class SpiralChart {
                 .attr('fill', '#999')
                 .text(month);
         });
+
+        // Jahresbeschriftungen hinzufügen
+        years.forEach((year, yearIndex) => {
+            // Position für Jahresbeschriftung: rechts von Januar-Linie
+            const januaryAngle = -Math.PI / 2 + Math.PI / 12; // Etwas versetzt von Januar
+            
+            // Finde den mittleren Radius für dieses Jahr
+            const yearData = this.data.filter(d => d.year === year);
+            if (yearData.length > 0) {
+                const yearStartIndex = this.data.findIndex(d => d.year === year);
+                const yearEndIndex = this.data.map((d, i) => d.year === year ? i : -1).filter(i => i !== -1).pop();
+                
+                const yearStartRadius = startRadius + yearStartIndex * radiusIncrease;
+                const yearEndRadius = startRadius + yearEndIndex * radiusIncrease;
+                const yearMidRadius = (yearStartRadius + yearEndRadius) / 2;
+                
+                // Position für die Jahresbeschriftung
+                const yearLabelRadius = yearMidRadius + 35;
+                const yearX = Math.cos(januaryAngle) * yearLabelRadius;
+                const yearY = Math.sin(januaryAngle) * yearLabelRadius;
+                
+                // Hintergrund für bessere Lesbarkeit
+                g.append('circle')
+                    .attr('cx', yearX)
+                    .attr('cy', yearY)
+                    .attr('r', 18)
+                    .attr('fill', 'white')
+                    .attr('opacity', 0.8)
+                    .attr('stroke', '#ccc')
+                    .attr('stroke-width', 1);
+                
+                g.append('text')
+                    .attr('x', yearX)
+                    .attr('y', yearY + 4)
+                    .attr('text-anchor', 'middle')
+                    .attr('font-size', isMobile ? '11px' : '13px')
+                    .attr('font-weight', 'bold')
+                    .attr('fill', '#333')
+                    .text(year);
+            }
+        });
             
         // Touch-optimierte Einstellungen für mobile Geräte
-        const baseStrokeWidth = isMobile ? 2 : 1.5;
-        const hoverStrokeWidth = isMobile ? 3.5 : 3;
+        const maxStrokeWidth = isMobile ? 2 : 1.5;
+        const minStrokeWidth = isMobile ? 0.8 : 0.6;
+        const maxHoverStrokeWidth = isMobile ? 3.5 : 3;
+        const minHoverStrokeWidth = isMobile ? 2 : 1.5;
         const touchAreaWidth = isMobile ? 15 : 8;
             
         this.data.forEach((d, i) => {
             const dayProgress = i / totalDays;
             const angle = -Math.PI / 2 + dayProgress * totalRotations * 2 * Math.PI;
+            
+            // Berechne Radius - bei negativem yearGap werden Jahre kompakter
             const radius = startRadius + i * radiusIncrease;
+            
             const baseX = Math.cos(angle) * radius;
             const baseY = Math.sin(angle) * radius;
             const lineHeight = heightScale(d.accidents);
             const endX = Math.cos(angle) * (radius + lineHeight);
             const endY = Math.sin(angle) * (radius + lineHeight);
 
+            // Progressive Linienstärke: Innen dünner, außen dicker
+            const radiusProgress = (radius - startRadius) / (endRadius - startRadius);
+            const currentStrokeWidth = minStrokeWidth + (maxStrokeWidth - minStrokeWidth) * radiusProgress;
+            const currentHoverStrokeWidth = minHoverStrokeWidth + (maxHoverStrokeWidth - minHoverStrokeWidth) * radiusProgress;
+
             const lineGroup = g.append('g').style('cursor', 'pointer');
 
+            // Hauptlinie (tatsächliche Werte)
             const mainLine = lineGroup.append('line')
                 .attr('x1', baseX)
                 .attr('y1', baseY)
                 .attr('x2', endX)
                 .attr('y2', endY)
                 .attr('stroke', this.colorScale(d.accidents))
-                .attr('stroke-width', baseStrokeWidth)
+                .attr('stroke-width', currentStrokeWidth)
                 .attr('stroke-linecap', 'round')
                 .attr('opacity', 0.85)
-                .attr('data-base-width', baseStrokeWidth);
+                .attr('data-base-width', currentStrokeWidth)
+                .attr('data-hover-width', currentHoverStrokeWidth);
 
             // Vergrößerte Touch-Bereiche für Mobile
             lineGroup.append('line')
@@ -368,8 +443,9 @@ class SpiralChart {
                 .attr('stroke', 'transparent')
                 .attr('stroke-width', touchAreaWidth)
                 .on('mouseover touchstart', (event) => {
+                    const hoverWidth = parseFloat(mainLine.attr('data-hover-width'));
                     mainLine
-                        .attr('stroke-width', hoverStrokeWidth)
+                        .attr('stroke-width', hoverWidth)
                         .attr('opacity', 1);
 
                     this.tooltip
@@ -383,7 +459,7 @@ class SpiralChart {
                         .style('top', (event.pageY - 10) + 'px');
                 })
                 .on('mouseout touchend', () => {
-                    const baseWidth = mainLine.attr('data-base-width');
+                    const baseWidth = parseFloat(mainLine.attr('data-base-width'));
                     mainLine
                         .attr('stroke-width', baseWidth)
                         .attr('opacity', 0.85);
@@ -391,6 +467,89 @@ class SpiralChart {
                     this.tooltip.style('opacity', 0);
                 });
         });
+    }
+
+    createBackgroundArea(g, totalDays, totalRotations, startRadius, radiusIncrease, maxLineHeight, years, yearGap, adjustedEndRadius) {
+        // Erstelle Pfad für die äußere Spirale (maximale Höhe)
+        const outerPath = d3.path();
+        const innerPath = d3.path();
+        
+        // Berechne Punkte für äußere und innere Spirale
+        const numPoints = Math.min(totalDays, 500); // Begrenze für Performance
+        const pointInterval = Math.max(1, Math.floor(totalDays / numPoints));
+        
+        let firstOuter = true;
+        let firstInner = true;
+        
+        for (let i = 0; i < totalDays; i += pointInterval) {
+            const dayProgress = i / totalDays;
+            const angle = -Math.PI / 2 + dayProgress * totalRotations * 2 * Math.PI;
+            
+            // Einfache Radiusberechnung ohne zusätzliche Jahresabstände
+            const radius = startRadius + i * radiusIncrease;
+            
+            // Äußere Spirale (mit maximaler Höhe)
+            const outerX = Math.cos(angle) * (radius + maxLineHeight);
+            const outerY = Math.sin(angle) * (radius + maxLineHeight);
+            
+            // Innere Spirale (Basis-Radius)
+            const innerX = Math.cos(angle) * radius;
+            const innerY = Math.sin(angle) * radius;
+            
+            if (firstOuter) {
+                outerPath.moveTo(outerX, outerY);
+                firstOuter = false;
+            } else {
+                outerPath.lineTo(outerX, outerY);
+            }
+            
+            if (firstInner) {
+                innerPath.moveTo(innerX, innerY);
+                firstInner = false;
+            } else {
+                innerPath.lineTo(innerX, innerY);
+            }
+        }
+        
+        // Erstelle geschlossenen Pfad für die Fläche
+        const areaPath = d3.path();
+        
+        // Äußere Spirale (vorwärts)
+        for (let i = 0; i < totalDays; i += pointInterval) {
+            const dayProgress = i / totalDays;
+            const angle = -Math.PI / 2 + dayProgress * totalRotations * 2 * Math.PI;
+            
+            const radius = startRadius + i * radiusIncrease;
+            const outerX = Math.cos(angle) * (radius + maxLineHeight);
+            const outerY = Math.sin(angle) * (radius + maxLineHeight);
+            
+            if (i === 0) {
+                areaPath.moveTo(outerX, outerY);
+            } else {
+                areaPath.lineTo(outerX, outerY);
+            }
+        }
+        
+        // Innere Spirale (rückwärts)
+        for (let i = totalDays - 1; i >= 0; i -= pointInterval) {
+            const dayProgress = i / totalDays;
+            const angle = -Math.PI / 2 + dayProgress * totalRotations * 2 * Math.PI;
+            
+            const radius = startRadius + i * radiusIncrease;
+            const innerX = Math.cos(angle) * radius;
+            const innerY = Math.sin(angle) * radius;
+            
+            areaPath.lineTo(innerX, innerY);
+        }
+        
+        areaPath.closePath();
+        
+        // Zeichne die Hintergrund-Fläche
+        g.append('path')
+            .attr('d', areaPath.toString())
+            .attr('fill', '#e8e8e8')
+            .attr('opacity', 0.3)
+            .attr('stroke', 'none');
     }
 }
 
