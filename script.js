@@ -2,8 +2,10 @@ class SpiralChart {
     constructor() {
         this.margin = { top: 10, right: 40, bottom: 40, left: 40 };
         this.data = [];
-        this.colorScale = d3.scaleSequential(d3.interpolateViridis).domain([1, 0]); // Umgekehrter Farbverlauf
-        
+        const maxAccidents = d3.max(this.data, d => d.accidents) || 1;
+        this.colorScale = d3.scaleLinear()
+            .domain([0, maxAccidents])
+            .range(['#8f2020ff', '#ecdb59ff']);
         this.init();
         this.loadData();
     }
@@ -534,7 +536,7 @@ class SpiralChart {
         // Zeichne die Hintergrund-Fläche
         g.append('path')
             .attr('d', areaPath.toString())
-            .attr('fill', '#e8e8e8')
+            .attr('fill', '#c6c6c6ff')
             .attr('opacity', 0.3)
             .attr('stroke', 'none');
     }
