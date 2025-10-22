@@ -389,10 +389,10 @@ class SpiralChart {
     // Linien für jeden Tag
     const thicknessFactor = isMobile ? 2.0 : 4.1; 
 
-    const maxStrokeWidth = (isMobile ? 2 : 1.5) * thicknessFactor;
-    const minStrokeWidth = (isMobile ? 0.8 : 0.6) * thicknessFactor;
-    const maxHoverStrokeWidth = (isMobile ? 3.5 : 3) * thicknessFactor;
-    const minHoverStrokeWidth = (isMobile ? 2 : 1.5) * thicknessFactor;
+    const maxStrokeWidth = (isMobile ? 2.2 : 1.4) * thicknessFactor;
+    const minStrokeWidth = (isMobile ? 0.6 : 0.4) * thicknessFactor;
+    const maxHoverStrokeWidth = (isMobile ? 3 : 2) * thicknessFactor;
+    const minHoverStrokeWidth = (isMobile ? 1.6 : 1) * thicknessFactor;
     const touchAreaWidth = isMobile ? 15 : 8;
         
     this.data.forEach((d, i) => {
