@@ -387,7 +387,7 @@ class SpiralChart {
     });
 
     // Linien für jeden Tag
-    const thicknessFactor = 4.1; // <--- einfach anpassen
+    const thicknessFactor = isMobile ? 2.0 : 4.1; 
 
     const maxStrokeWidth = (isMobile ? 2 : 1.5) * thicknessFactor;
     const minStrokeWidth = (isMobile ? 0.8 : 0.6) * thicknessFactor;
