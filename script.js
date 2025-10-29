@@ -5,7 +5,7 @@ class SpiralChart {
         const maxAccidents = d3.max(this.data, d => d.accidents) || 1;
         this.colorScale = d3.scaleLinear()
             .domain([0, maxAccidents])
-            .range(['#8f2020ff', '#ecdb59ff']);
+            .range(['#762121ff', '#62b9d3ff']);
         this.init();
         this.loadData();
     }
@@ -123,63 +123,61 @@ class SpiralChart {
         return data;
     }
     
-    processData(rawData) {
-        this.data = rawData.map((d) => {
-            let date;
-            let dateStr = d.Datum || d.datum || '';
-            
-            if (!dateStr) return null;
-            
-            if (dateStr.includes('-')) {
-                const parts = dateStr.split('-');
-                if (parts[0].length === 4) {
-                    date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                } else {
-                    date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                }
-            } else if (dateStr.includes('.')) {
-                const parts = dateStr.split('.');
-                date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+processData(rawData) {
+    this.data = rawData.map((d) => {
+        let date;
+        let dateStr = d.Datum || d.datum || '';
+        
+        if (!dateStr) return null;
+        
+        if (dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            if (parts[0].length === 4) {
+                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             } else {
-                return null;
+                date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
             }
-            
-            let accidents = 0;
-            const possibleColumns = [
-                'Verunglueckte_auf_EScooter',
-                'Verunglückte_auf_EScooter', 
-                'Verunglueckte auf EScooter',
-                'EScooter',
-                'E-Scooter',
-                'escooter',
-                'e-scooter'
-            ];
-            
-            for (let col of possibleColumns) {
-                if (d[col] !== undefined && d[col] !== '' && d[col] !== null) {
-                    accidents = parseInt(d[col]) || 0;
-                    break;
-                }
+        } else if (dateStr.includes('.')) {
+            const parts = dateStr.split('.');
+            date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        } else {
+            return null;
+        }
+        
+        let accidents = 0;
+        const possibleColumns = [
+            'Verunglueckte_auf_EScooter',
+            'Verunglückte_auf_EScooter', 
+            'Verunglueckte auf EScooter',
+            'EScooter',
+            'E-Scooter',
+            'escooter',
+            'e-scooter'
+        ];
+        
+        for (let col of possibleColumns) {
+            if (d[col] !== undefined && d[col] !== '' && d[col] !== null) {
+                accidents = parseInt(d[col]) || 0;
+                break;
             }
-            
-            if (isNaN(date.getTime())) return null;
-            
-            return {
-                date: date,
-                accidents: accidents,
-                year: date.getFullYear(),
-                dayOfYear: this.getDayOfYear(date),
-                daysSinceStart: this.getDaysSinceStart(date)
-            };
-        }).filter(d => d !== null && d.year >= 2021 && d.year <= 2024);
+        }
         
-        this.data.sort((a, b) => a.date - b.date);
+        if (isNaN(date.getTime())) return null;
         
-        const maxAccidents = d3.max(this.data, d => d.accidents);
-        this.colorScale.domain([maxAccidents || 1, 0]);
-        
-        this.createLegend();
-    }
+        return {
+            date: date,
+            accidents: accidents,
+            year: date.getFullYear(),
+            dayOfYear: this.getDayOfYear(date),
+            daysSinceStart: this.getDaysSinceStart(date)
+        };
+    }).filter(d => d !== null && d.year >= 2021 && d.year <= 2024);
+    
+    this.data.sort((a, b) => a.date - b.date);
+    
+    const maxAccidents = d3.max(this.data, d => d.accidents);
+    this.colorScale.domain([maxAccidents || 1, 0]);
+}
     
     getDaysSinceStart(date) {
         const startDate = new Date(2021, 0, 1);
@@ -295,7 +293,7 @@ class SpiralChart {
         .domain([0, maxAccidents])
         .range([0, 60]);
     
-    const isMobile = window.innerWidth <= 768;
+    const isMobile = window.innerWidth <= 760;
     const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     const defs = g.append('defs');
 
@@ -313,7 +311,7 @@ class SpiralChart {
         const x1 = Math.cos(angle) * (startRadius - 30);
         const y1 = Math.sin(angle) * (startRadius - 30);
         const x2 = Math.cos(angle) * (actualEndRadius + 32);
-        const y2 = Math.sin(angle) * (actualEndRadius + 32);
+        const y2 = Math.sin(angle) * (actualEndRadius + 10);
 
         const gradId = `month-gradient-${i}`;
         const gradient = defs.append('linearGradient')
@@ -324,11 +322,11 @@ class SpiralChart {
 
         gradient.append('stop')
             .attr('offset', '0%')
-            .attr('stop-color', '#bbb')
+            .attr('stop-color', '#130a27ff')
             .attr('stop-opacity', 0.05);
         gradient.append('stop')
             .attr('offset', '100%')
-            .attr('stop-color', '#666')
+            .attr('stop-color', '#130a27ff')
             .attr('stop-opacity', 0.7);
 
         g.append('line')
@@ -346,7 +344,7 @@ class SpiralChart {
             .attr('text-anchor', 'middle')
             .attr('font-size', isMobile ? '10px' : '12px')
             .attr('font-weight', 'bold')
-            .attr('fill', '#999')
+            .attr('fill', '#150e29ff')
             .text(month);
     });
 
@@ -381,7 +379,7 @@ class SpiralChart {
             .attr('text-anchor', 'middle')
             .attr('font-size', isMobile ? '11px' : '12px') // etwas dezenter als Monatslabels
             .attr('font-weight', '700')
-            .attr('fill', '#666')
+            .attr('fill', '#0e0c23ff')
             .style('pointer-events', 'none')
             .text(year);
     });
@@ -389,8 +387,8 @@ class SpiralChart {
     // Linien für jeden Tag
     const thicknessFactor = isMobile ? 2.0 : 4.1; 
 
-    const maxStrokeWidth = (isMobile ? 2.2 : 1.4) * thicknessFactor;
-    const minStrokeWidth = (isMobile ? 0.6 : 0.4) * thicknessFactor;
+    const maxStrokeWidth = (isMobile ? 2.2 : 1.2) * thicknessFactor;
+    const minStrokeWidth = (isMobile ? 0.6 : 0.2) * thicknessFactor;
     const maxHoverStrokeWidth = (isMobile ? 3 : 2) * thicknessFactor;
     const minHoverStrokeWidth = (isMobile ? 1.6 : 1) * thicknessFactor;
     const touchAreaWidth = isMobile ? 15 : 8;
@@ -443,7 +441,6 @@ class SpiralChart {
                     .html(`
                         <strong>Datum:</strong> ${d.date.toLocaleDateString('de-DE')}<br/>
                         <strong>E-Scooter Unfälle:</strong> ${d.accidents}<br/>
-                        <strong>Jahr:</strong> ${d.year}
                     `)
                     .style('left', (event.pageX + 10) + 'px')
                     .style('top', (event.pageY - 10) + 'px');
@@ -538,7 +535,7 @@ class SpiralChart {
         // Zeichne die Hintergrund-Fläche
         g.append('path')
             .attr('d', areaPath.toString())
-            .attr('fill', '#c6c6c6ff')
+            .attr('fill', '#efdcb7ff')
             .attr('opacity', 0.3)
             .attr('stroke', 'none');
     }

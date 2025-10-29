@@ -10,7 +10,7 @@
             margin: 0;
             padding: 10px;
             font-family: Arial, sans-serif;
-            background-color: #f8f9fa;
+            background-color: #fffdee90;
         }
        
         .container {
@@ -20,7 +20,7 @@
        
         h1 {
             text-align: center;
-            color: #333;
+            color: #000000;
             margin-bottom: 20px;
         }
         #legend-container {
@@ -36,7 +36,7 @@
             text-align: left;
             padding: 10px;
             font-size: 12px;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(27, 75, 107, 0.95);
             color: white;
             border-radius: 4px;
             pointer-events: none;
@@ -49,23 +49,23 @@
                 padding: 5px;
                 margin: 0;
             }
-            
+           
             .container {
                 padding: 0;
                 max-width: 100%;
             }
-            
+           
             h1 {
                 font-size: 1.3em;
                 margin-bottom: 10px;
                 padding: 0 10px;
             }
-            
+           
             #legend-container {
                 margin-bottom: 5px;
                 padding: 0 5px;
             }
-            
+           
             .spiral-container {
                 /* Nutze fast den ganzen Bildschirm für die Spirale */
                 width: 100vw;
@@ -77,15 +77,15 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: #f8f9fa;
+                background: transparent;
             }
-            
+           
             #spiral {
                 /* Maximal verfügbaren Raum nutzen, aber proportional */
                 width: 95vmin !important;
                 height: 95vmin !important;
             }
-            
+           
             .tooltip {
                 font-size: 14px;
                 padding: 12px;
@@ -94,17 +94,17 @@
                 transform: translateX(-50%);
             }
         }
-        
+       
         @media (max-width: 480px) {
             .spiral-container {
                 height: 70vh; /* Etwas weniger Höhe auf sehr kleinen Bildschirmen */
             }
-            
+           
             h1 {
                 font-size: 1.1em;
             }
         }
-        
+       
         /* Landscape Modus nutzen */
         @media (max-width: 768px) and (orientation: landscape) {
             .spiral-container {
@@ -116,7 +116,6 @@
 <body>
     <div class="container">
         <h1>Tägliche E-Scooter Unfälle in Deutschland 2021-2024</h1>
-        <div id="legend-container"></div>
         <div class="spiral-container">
             <svg id="spiral"></svg>
         </div>
